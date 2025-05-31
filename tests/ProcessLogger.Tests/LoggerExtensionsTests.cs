@@ -458,6 +458,38 @@ public partial class LoggerExtensionsTests
         Assert.Equal("success", span.Tags.FirstOrDefault(t => t.Key == "process.status").Value);
     }
 
+[Fact]
+public async Task TrackProcessAsync_Uses_Custom_ActivitySource_WhenProvided()
+{
+    var logger = new TestLogger();
+    var customSpans = new List<Activity>();
+    var customSource = new ActivitySource("CustomSource");
+
+    using var listener = new ActivityListener
+    {
+        ShouldListenTo = source => source.Name == "CustomSource",
+        Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        ActivityStarted = _ => { },
+        ActivityStopped = activity => customSpans.Add(activity)
+    };
+
+    ActivitySource.AddActivityListener(listener);
+
+    var options = new ProcessLoggerOptions
+    {
+        ActivitySourceOverride = customSource
+    };
+
+    await logger.TrackProcessAsync("CustomSpanProcess", async () =>
+    {
+        await Task.Delay(5);
+    }, options: options);
+
+    var span = Assert.Single(customSpans);
+    Assert.Equal("CustomSpanProcess", span.DisplayName);
+    Assert.Equal("success", span.Tags.FirstOrDefault(t => t.Key == "process.status").Value);
+}
+
 
 
     [Fact]

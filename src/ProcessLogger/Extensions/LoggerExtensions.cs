@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using ProcessLogger.Options;
 
 namespace ProcessLogger.Extensions;
 
@@ -77,10 +76,12 @@ public static class LoggerExtensions
 
         var start = Stopwatch.GetTimestamp();
 
+        var source = options.ActivitySourceOverride ?? ProcessLoggerContext.ActivitySource;
+
         Activity? activity = null;
-        if (ActivitySource.HasListeners())
+        if (source.HasListeners())
         {
-            activity = ActivitySource.StartActivity(name, ActivityKind.Internal);
+            activity = source.StartActivity(name, ActivityKind.Internal);
             if (activity != null && options.ConfigureSpan is not null)
             {
                 options.ConfigureSpan(activity);

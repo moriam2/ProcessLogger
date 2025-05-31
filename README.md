@@ -12,6 +12,7 @@
 - ⚙️ **Configurable log levels** for start, success, and failure  
 - 📡 **Optional OpenTelemetry** span generation via `ActivitySource`  
 - 🔧 Optional hook to customize each span via `ConfigureSpan`  
+- 🌐 Optional override of `ActivitySource` to integrate with existing OTEL pipelines  
 - 📦 No external dependencies (uses only `ILogger` and `System.Diagnostics`)  
 - 🧪 Compatible with all logging providers (Serilog, NLog, Console, etc.)
 
@@ -77,13 +78,12 @@ If no options are provided, **sensible defaults are used**.
 
 If your app uses OpenTelemetry, `ProcessLogger` will automatically:
 
-- Start an `Activity` when `ActivitySource` is enabled
+- Start an `Activity` when OpenTelemetry listeners are present
 - Attach tags like:
   - `process.status` (`success` or `failure`)
-  - `process.duration_ms`
   - Any thrown exception (as error status)
 
-You can also customize the span using `ConfigureSpan`:
+You can customize the span using `ConfigureSpan`:
 
 ```csharp
 var options = new ProcessLoggerOptions
@@ -96,7 +96,20 @@ var options = new ProcessLoggerOptions
 };
 ```
 
-If OpenTelemetry is not configured, it silently falls back to pure logging.
+You can also override the `ActivitySource` if you're using a shared source:
+
+```csharp
+var options = new ProcessLoggerOptions
+{
+    ActivitySourceOverride = myCustomSource
+};
+```
+
+### 🔒 Not Using OpenTelemetry? No Problem!
+
+If you're not using OpenTelemetry, you don't need to configure or think about it.  
+**ProcessLogger works perfectly with just logs.**  
+OpenTelemetry features are completely optional and safe to ignore.
 
 ---
 
@@ -113,6 +126,7 @@ Test coverage includes:
 - Failure propagation
 - Log level customization
 - OpenTelemetry span emission and tagging
+- Custom `ActivitySource` usage
 
 ---
 
