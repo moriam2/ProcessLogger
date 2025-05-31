@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Description>Lightweight, structured logging utility for .NET with process tracking and optional OpenTelemetry support.</Description>
+    <PackageTags>logging;structured-logging;opentelemetry;dotnet;diagnostics</PackageTags>
+    <Authors>Micheál Moriarty</Authors>
+    <Company>github.com/moriam2</Company>
+    <RepositoryUrl>https://github.com/moriam2/ProcessLogger</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+</Project>
