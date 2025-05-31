@@ -94,7 +94,7 @@ public static class LoggerExtensions
 
             logger.Log(options.SuccessLogLevel, "[{Name}] Completed in {Duration}ms {Metadata}", name, durationMs, metadata);
             activity?.SetTag("process.status", "success");
-            activity?.SetTag("process.duration_ms", durationMs);
+            //activity?.SetTag("process.duration_ms", durationMs); //Remove (redundant, spans already include duration)
         }
         catch (Exception ex)
         {
@@ -102,7 +102,7 @@ public static class LoggerExtensions
 
             logger.Log(options.FailureLogLevel, ex, "[{Name}] Failed after {Duration}ms {Metadata}", name, durationMs, metadata);
             activity?.SetTag("process.status", "failure");
-            activity?.SetTag("process.duration_ms", durationMs);
+            // activity?.SetTag("process.duration_ms", durationMs);
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             throw;
         }
