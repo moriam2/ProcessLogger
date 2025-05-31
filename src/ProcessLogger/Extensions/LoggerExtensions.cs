@@ -7,10 +7,24 @@ using ProcessLogger.Options;
 
 namespace ProcessLogger.Extensions;
 
+/// <summary>
+/// Provides extension methods for <see cref="ILogger"/> to track the execution of asynchronous operations
+/// with structured logging and optional telemetry (via <see cref="Activity"/>).
+/// </summary>
 public static class LoggerExtensions
 {
     private static readonly ActivitySource ActivitySource = new("ProcessLogger");
 
+    /// <summary>
+    /// Tracks the execution of an asynchronous operation with logging and optional telemetry.
+    /// Logs the start and success/failure, and emits a span if listeners are registered.
+    /// </summary>
+    /// <param name="logger">The logger instance.</param>
+    /// <param name="name">The name of the process being tracked.</param>
+    /// <param name="action">The asynchronous operation to execute.</param>
+    /// <param name="metadata">Optional metadata object to include in the logs.</param>
+    /// <param name="options">Optional logger behavior configuration. If null, default options are used.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public static Task TrackProcessAsync(
         this ILogger logger,
         string name,
@@ -26,6 +40,16 @@ public static class LoggerExtensions
             CancellationToken.None);
     }
 
+    /// <summary>
+    /// Tracks the execution of an asynchronous operation with logging, telemetry, and cancellation support.
+    /// </summary>
+    /// <param name="logger">The logger instance.</param>
+    /// <param name="name">The name of the process being tracked.</param>
+    /// <param name="action">The asynchronous operation to execute, which supports cancellation.</param>
+    /// <param name="metadata">Optional metadata object to include in the logs.</param>
+    /// <param name="options">Optional logger behavior configuration. If null, default options are used.</param>
+    /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public static Task TrackProcessAsync(
         this ILogger logger,
         string name,
@@ -38,6 +62,9 @@ public static class LoggerExtensions
         return TrackProcessInternalAsync(logger, name, action, metadata, options, cancellationToken);
     }
 
+    /// <summary>
+    /// Internal implementation of process tracking with logging, exception handling, and span emission.
+    /// </summary>
     private static async Task TrackProcessInternalAsync(
         ILogger logger,
         string name,
@@ -85,6 +112,11 @@ public static class LoggerExtensions
         }
     }
 
+    /// <summary>
+    /// Calculates the duration in milliseconds from a given <see cref="Stopwatch"/> start timestamp.
+    /// </summary>
+    /// <param name="startTimestamp">The timestamp captured when the operation started.</param>
+    /// <returns>The duration in milliseconds.</returns>
     private static double GetDurationMs(long startTimestamp)
     {
         return (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
