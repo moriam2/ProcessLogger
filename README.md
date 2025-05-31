@@ -1,4 +1,3 @@
-
 # ProcessLogger
 
 **ProcessLogger** is a lightweight .NET library for tracking logical operations with structured log messages and optional OpenTelemetry tracing.
@@ -7,13 +6,13 @@
 
 ## ✅ Features
 
-- 🔁 Logs **start / success / failure** messages for any logical process
-- ⏱️ Includes **duration tracking**
-- ⚠️ **Exception-safe** — failures are logged and rethrown
-- ⚙️ **Configurable log levels** for start, success, and failure
-- 📡 **Optional OpenTelemetry** span generation via `ActivitySource`
-- 🔧 Optional hook to customize each span via `ConfigureSpan`
-- 📦 No external dependencies (uses only `ILogger` and `System.Diagnostics`)
+- 🔁 Logs **start / success / failure** messages for any logical process  
+- ⏱️ Includes **duration tracking**  
+- ⚠️ **Exception-safe** — failures are logged and rethrown  
+- ⚙️ **Configurable log levels** for start, success, and failure  
+- 📡 **Optional OpenTelemetry** span generation via `ActivitySource`  
+- 🔧 Optional hook to customize each span via `ConfigureSpan`  
+- 📦 No external dependencies (uses only `ILogger` and `System.Diagnostics`)  
 - 🧪 Compatible with all logging providers (Serilog, NLog, Console, etc.)
 
 ---
@@ -29,12 +28,12 @@ dotnet add package ProcessLogger
 Use the extension method to wrap a logical process:
 
 ```csharp
-await logger.TrackProcessAsync("ImportFile", new { FileId = 123 }, async () =>
+await logger.TrackProcessAsync("ImportFile", async () =>
 {
     await fileService.DownloadAsync();
     await fileService.ParseAsync();
     await fileService.StoreAsync();
-});
+}, metadata: new { FileId = 123 });
 ```
 
 Produces logs like:
@@ -64,9 +63,10 @@ var options = new ProcessLoggerOptions
     FailureLogLevel = LogLevel.Error
 };
 
-await logger.TrackProcessAsync("DoThing", options, async () => {
+await logger.TrackProcessAsync("DoThing", async () =>
+{
     await DoWorkAsync();
-});
+}, options: options);
 ```
 
 If no options are provided, **sensible defaults are used**.
