@@ -1,13 +1,14 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using ProcessLogger.Extensions;
 using ProcessLogger.Options;
 
 namespace ProcessLogger.Tests;
 
+[Collection("NonParallelTests")] //ActivitySource.AddActivityListener(listener); listeners persist globally across tests and can interfere with each other.
 public partial class LoggerExtensionsTests
 {
-    private readonly List<Activity> _capturedSpans = new();
 
     [Fact]
     public async Task TrackProcessAsync_LogsStartAndSuccess()
@@ -23,6 +24,19 @@ public partial class LoggerExtensionsTests
         Assert.Contains(logs, l => l.Contains("Starting process"));
         Assert.Contains(logs, l => l.Contains("Completed in"));
     }
+    [Fact]
+    public async Task TrackProcessAsync_LogsMetadataCorrectly()
+    {
+        var logger = new TestLogger();
+
+        await logger.TrackProcessAsync("Meta", async () =>
+        {
+            await Task.Delay(10);
+        }, new { Id = 42, Status = "OK" });
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("42") && e.Message.Contains("OK"));
+    }
+
 
     [Fact]
     public async Task TrackProcessAsync_WorksWithoutMetadata()
@@ -297,7 +311,7 @@ public partial class LoggerExtensionsTests
     public async Task ConfigureSpan_IsCalledAndAddsTags()
     {
         var logger = new TestLogger();
-        _capturedSpans.Clear();
+        List<Activity> _capturedSpans = new();
         var wasCalled = false;
 
         using var listener = new ActivityListener
@@ -360,10 +374,39 @@ public partial class LoggerExtensionsTests
     }
 
     [Fact]
+    public async Task TrackProcessAsync_EmitsSpan_WhenLoggingIsDisabled()
+    {
+        var capturedActivities = new List<Activity>();
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "ProcessLogger",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = _ => { },
+            ActivityStopped = activity => capturedActivities.Add(activity)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var logger = new SilentLogger(); // suppresses logging
+
+        await logger.TrackProcessAsync("SilentSpan", async () =>
+        {
+            await Task.Delay(10);
+        });
+
+        Assert.Single(capturedActivities);
+        var span = capturedActivities[0];
+
+        Assert.Equal("SilentSpan", span.DisplayName);
+        Assert.Equal("success", span.Tags.FirstOrDefault(t => t.Key == "process.status").Value);
+    }
+
+
+    [Fact]
     public async Task ConfigureSpan_CanMutateSpanProperties()
     {
         var logger = new TestLogger();
-        _capturedSpans.Clear(); // Clear previous spans
+        List<Activity> _capturedSpans = new();
 
         using var listener = new ActivityListener
         {
@@ -391,36 +434,130 @@ public partial class LoggerExtensionsTests
     }
 
 
+    [Fact]
+    public async Task TrackProcessAsync_EmitsSpan_EvenWhenLoggingIsDisabled()
+    {
+        var capturedActivities = new List<Activity>();
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "ProcessLogger",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = _ => { },
+            ActivityStopped = activity => capturedActivities.Add(activity)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        // Logger that disables all log levels
+        var logger = new DisabledLogger();
+
+        await logger.TrackProcessAsync("SilentTrace", async () => await Task.Delay(5));
+
+        var span = Assert.Single(capturedActivities);
+        Assert.Equal("SilentTrace", span.DisplayName);
+        Assert.Equal("success", span.Tags.FirstOrDefault(t => t.Key == "process.status").Value);
+    }
+
+
+
+    [Fact]
+    public async Task TrackProcessAsync_AllowsConcurrentUsage()
+    {
+        var logger = new TestLogger();
+        const int concurrentTasks = 100;
+
+        var tasks = Enumerable.Range(0, concurrentTasks).Select(i =>
+            logger.TrackProcessAsync($"Process{i}", async () =>
+            {
+                await Task.Delay(20);
+            }));
+
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(concurrentTasks, logger.Entries.Count(e => e.Message.Contains("Completed")));
+    }
+
+    [Fact]
+    public async Task TrackProcessAsync_AlwaysRethrows_OnFailure()
+    {
+        var logger = new TestLogger();
+
+        await Assert.ThrowsAsync<DivideByZeroException>(() =>
+            logger.TrackProcessAsync("Explodes", async () =>
+            {
+                int a = 1;
+                int b = 0;
+                _ = a / b; // Runtime exception
+            }));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("Starting process"));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("Failed after"));
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("Completed"));
+    }
+
+
+
+
+
+
     // Minimal test logger
     private class TestLogger : ILogger
     {
-        private readonly List<(LogLevel Level, string Message, Exception? Exception)> _entries
-            = [];
-
+        private readonly ConcurrentQueue<(LogLevel Level, string Message, Exception? Exception)> _entries = new();
         private readonly Action<string>? _simpleLog;
-
-        private readonly List<Activity> _capturedSpans
-            = [];
-
 
         public TestLogger(Action<string>? simpleLog = null)
         {
             _simpleLog = simpleLog;
         }
 
-        public IReadOnlyList<(LogLevel Level, string Message, Exception? Exception)> Entries => _entries;
+        public IReadOnlyCollection<(LogLevel Level, string Message, Exception? Exception)> Entries => _entries;
 
         public IDisposable BeginScope<TState>(TState state) where TState : notnull => default!;
 
         public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-            Exception? exception, Func<TState, Exception?, string> formatter)
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
         {
             var message = formatter(state, exception);
-            _entries.Add((logLevel, message, exception));
+            _entries.Enqueue((logLevel, message, exception));
             _simpleLog?.Invoke(message);
         }
     }
+
+
+    private class DisabledLogger : ILogger
+    {
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => default!;
+        public bool IsEnabled(LogLevel logLevel) => false;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            // Intentionally does nothing
+        }
+    }
+
+    private class SilentLogger : ILogger
+    {
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => default!;
+        public bool IsEnabled(LogLevel logLevel) => false;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            // No-op
+        }
+    }
+
+
 
 }
