@@ -53,3 +53,20 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 .DS_Store
+# Coverage reports
+TestResults/
+coverage-report/
+**/coverage.cobertura.xml
+**/coverage.json
+**/coverage.info
+**/coverage.opencover.xml
+**/coverage.xml
+
+# ReportGenerator output
+coverage-report/
+report/
+reports/
+
+# Coverlet output (if using --output)
+coverage.*
+
