@@ -7,6 +7,8 @@ namespace ProcessLogger.Tests;
 
 public partial class LoggerExtensionsTests
 {
+    private readonly List<Activity> _capturedSpans = new();
+
     [Fact]
     public async Task TrackProcessAsync_LogsStartAndSuccess()
     {
@@ -291,15 +293,115 @@ public partial class LoggerExtensionsTests
     }
 
 
+    [Fact]
+    public async Task ConfigureSpan_IsCalledAndAddsTags()
+    {
+        var logger = new TestLogger();
+        _capturedSpans.Clear();
+        var wasCalled = false;
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = s => s.Name == "ProcessLogger",
+            Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
+            ActivityStarted = _ => { },
+            ActivityStopped = act => _capturedSpans.Add(act)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var options = new ProcessLoggerOptions
+        {
+            ConfigureSpan = span =>
+            {
+                wasCalled = true;
+                span?.SetTag("custom.tag", "test123");
+            }
+        };
+
+        await logger.TrackProcessAsync("ConfigureSpanTest", async () => await Task.Delay(10), options: options);
+
+        Assert.True(wasCalled);
+        var activity = Assert.Single(_capturedSpans);
+        Assert.Equal("test123", activity.Tags.FirstOrDefault(t => t.Key == "custom.tag").Value);
+    }
+
+    [Fact]
+    public async Task ConfigureSpan_IsNotCalled_IfNoActivityListener()
+    {
+        var logger = new TestLogger();
+        var wasCalled = false;
+
+        var options = new ProcessLoggerOptions
+        {
+            ConfigureSpan = _ => wasCalled = true
+        };
+
+        await logger.TrackProcessAsync("NoTelemetry", async () => await Task.Delay(5), options: options);
+
+        Assert.False(wasCalled);
+    }
+
+    [Fact]
+    public async Task ConfigureSpan_Null_DoesNotBreakLogging()
+    {
+        var logger = new TestLogger();
+
+        var options = new ProcessLoggerOptions
+        {
+            ConfigureSpan = null,
+            StartLogLevel = LogLevel.Information,
+            SuccessLogLevel = LogLevel.Information
+        };
+
+        await logger.TrackProcessAsync("NullConfigureSpan", async () => await Task.Delay(5), options: options);
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Starting process"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Completed in"));
+    }
+
+    [Fact]
+    public async Task ConfigureSpan_CanMutateSpanProperties()
+    {
+        var logger = new TestLogger();
+        _capturedSpans.Clear(); // Clear previous spans
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = s => s.Name == "ProcessLogger",
+            Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
+            ActivityStopped = act => _capturedSpans.Add(act)
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var options = new ProcessLoggerOptions
+        {
+            ConfigureSpan = span =>
+            {
+                span.DisplayName = "RenamedSpan";
+                span.SetStatus(ActivityStatusCode.Error, "custom description");
+            }
+        };
+
+        await logger.TrackProcessAsync("OriginalName", async () => await Task.Delay(5), options: options);
+
+        var span = Assert.Single(_capturedSpans);
+        Assert.Equal("RenamedSpan", span.DisplayName);
+        Assert.Equal("custom description", span.StatusDescription);
+        Assert.Equal(ActivityStatusCode.Error, span.Status);
+    }
 
 
     // Minimal test logger
     private class TestLogger : ILogger
     {
         private readonly List<(LogLevel Level, string Message, Exception? Exception)> _entries
-            = new();
+            = [];
 
         private readonly Action<string>? _simpleLog;
+
+        private readonly List<Activity> _capturedSpans
+            = [];
+
 
         public TestLogger(Action<string>? simpleLog = null)
         {

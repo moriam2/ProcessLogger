@@ -54,6 +54,10 @@ public static class LoggerExtensions
         if (ActivitySource.HasListeners())
         {
             activity = ActivitySource.StartActivity(name, ActivityKind.Internal);
+            if (activity != null && options.ConfigureSpan is not null)
+            {
+                options.ConfigureSpan(activity);
+            }
         }
 
         try
