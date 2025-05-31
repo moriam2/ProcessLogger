@@ -37,14 +37,14 @@ await logger.TrackProcessAsync("ImportFile", new { FileId = 123 }, async () =>
 
 Produces logs like:
 
-```
+```text
 [ImportFile] Started process (FileId=123)
 [ImportFile] Completed process in 208ms (FileId=123)
 ```
 
 On failure:
 
-```
+```text
 [ImportFile] Process failed after 89ms (FileId=123): System.Exception: Parse error
 ```
 
@@ -74,6 +74,7 @@ If no options are provided, **sensible defaults are used**.
 ## 🔍 OpenTelemetry Integration (Optional)
 
 If your app uses OpenTelemetry, `ProcessLogger` will automatically:
+
 - Start an `Activity` when tracing is enabled
 - Attach duration and exceptions as span attributes
 

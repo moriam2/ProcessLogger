@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ProcessLogger.Options;
@@ -10,15 +11,41 @@ public static class LoggerExtensions
 {
     private static readonly ActivitySource ActivitySource = new("ProcessLogger");
 
-    public static async Task TrackProcessAsync(
+    public static Task TrackProcessAsync(
         this ILogger logger,
         string name,
         Func<Task> action,
         object? metadata = null,
         ProcessLoggerOptions? options = null)
     {
-        options ??= ProcessLoggerOptions.Default;
+        return logger.TrackProcessAsync(
+            name,
+            _ => action(),
+            metadata,
+            options,
+            CancellationToken.None);
+    }
 
+    public static Task TrackProcessAsync(
+        this ILogger logger,
+        string name,
+        Func<CancellationToken, Task> action,
+        object? metadata = null,
+        ProcessLoggerOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        options ??= ProcessLoggerOptions.Default;
+        return TrackProcessInternalAsync(logger, name, action, metadata, options, cancellationToken);
+    }
+
+    private static async Task TrackProcessInternalAsync(
+        ILogger logger,
+        string name,
+        Func<CancellationToken, Task> action,
+        object? metadata,
+        ProcessLoggerOptions options,
+        CancellationToken cancellationToken)
+    {
         logger.Log(options.StartLogLevel, "[{Name}] Starting process {Metadata}", name, metadata);
 
         var start = Stopwatch.GetTimestamp();
@@ -31,7 +58,7 @@ public static class LoggerExtensions
 
         try
         {
-            await action();
+            await action(cancellationToken);
             var durationMs = GetDurationMs(start);
 
             logger.Log(options.SuccessLogLevel, "[{Name}] Completed in {Duration}ms {Metadata}", name, durationMs, metadata);
