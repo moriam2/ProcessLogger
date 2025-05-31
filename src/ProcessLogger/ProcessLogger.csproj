@@ -1,20 +1,36 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
+
+    <!-- NuGet Package Generation -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Description>Lightweight, structured logging utility for .NET with process tracking and optional OpenTelemetry support.</Description>
-    <PackageTags>logging;structured-logging;opentelemetry;dotnet;diagnostics</PackageTags>
+    <PackageId>ProcessLogger</PackageId>
+    <Version>1.0.0</Version>
     <Authors>Micheál Moriarty</Authors>
     <Company>github.com/moriam2</Company>
-    <RepositoryUrl>https://github.com/moriam2/ProcessLogger</RepositoryUrl>
+
+    <!-- NuGet Metadata -->
+    <Description>Lightweight, structured logging utility for .NET with process tracking and optional
+      OpenTelemetry support.</Description>
+    <Summary>ProcessLogger tracks logical operations with start/success/failure logs and spans, no
+      dependencies required.</Summary>
+    <PackageTags>logging;structured-logging;opentelemetry;dotnet;diagnostics;tracing;telemetry</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/moriam2/ProcessLogger</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/moriam2/ProcessLogger</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon> <!-- Optional: see note below -->
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>
